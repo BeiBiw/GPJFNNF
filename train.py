@@ -17,8 +17,6 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_sc
 from dataset_InsightModel import *
 
 def l2_normalize(vecs):
-    """标准化
-    """
     norms = (vecs**2).sum(axis=1, keepdims=True)**0.5
     return vecs / np.clip(norms, 1e-8, np.inf)
 
@@ -48,7 +46,6 @@ class Features:
 
 def evaluate(model):
     model.eval()
-    # 语料向量化
     all_a_vecs, all_b_vecs = [], []
     all_labels = []
     all_pred =[]
@@ -142,7 +139,7 @@ if __name__ == '__main__':
     with gzip.open(args.feature_intial, 'rb') as f:
         intial_features = pickle.load(f)
 
-    train_edge_path = os.path.join(args.edge_path,'train_edge1.txt')  ##构建一个完整的路径
+    train_edge_path = os.path.join(args.edge_path,'train_edge1.txt')
     test_edge_path = os.path.join(args.edge_path,'test_edge1.txt')
 
     train_edge = []
@@ -159,7 +156,6 @@ if __name__ == '__main__':
             line1 = line.strip().split(',')
             line2 = [int(num) for num in line1]
             test_edge.append(line2)
-    # 开始训练
     print("***** Running training *****")
     print("  Num examples = {}".format(len(train_features)))
     print("  Batch size = {}".format(args.train_batch_size))
@@ -181,8 +177,8 @@ if __name__ == '__main__':
 
     g1 = torch.tensor([f for f in train_edge], dtype=torch.long)
 
-    train_data = TensorDataset(train_s1_input_ids, train_s2_input_ids,g1, train_label_ids)  ###创建了一个 TensorDataset 对象，将这些张量组合在一起
-    train_dataloader = DataLoader(train_data, batch_size=args.train_batch_size, shuffle=True)  ###创建了一个 DataLoader 对象，用于批量加载数据
+    train_data = TensorDataset(train_s1_input_ids, train_s2_input_ids,g1, train_label_ids)  
+    train_dataloader = DataLoader(train_data, batch_size=args.train_batch_size, shuffle=True)
 
     test_s1_input_ids = torch.tensor([f.s1_input_ids for f in test_features], dtype=torch.long)
     test_s2_input_ids = torch.tensor([f.s2_input_ids for f in test_features], dtype=torch.long)
@@ -196,34 +192,29 @@ if __name__ == '__main__':
     zong_ids = torch.tensor([f for f in [f.s2_input_ids for f in train_features] + [f.s2_input_ids for f in test_features]],dtype=torch.long)
 
     num_train_steps = int(
-         len(train_features) / args.train_batch_size / args.gradient_accumulation_steps * args.num_train_epochs)  ###整个训练过程需要的梯度回传（优化）次数
-        ###gradient_accumulation_steps（梯度累积步数）：训练多少个batch后进行一次梯度回传（适用于显存受限的情况下进行更大批次的训练）
+         len(train_features) / args.train_batch_size / args.gradient_accumulation_steps * args.num_train_epochs) 
+    model = GPJFNNF()
 
-    # 模型
-    model = GPJFNNF()  ##实例化model
-
-    # 指定多gpu运行
-    if torch.cuda.is_available():  ###检查是否有GPU，如果有则将model传到GPU上
+    if torch.cuda.is_available(): 
         model.cuda()
 
-    tokenizer = BertTokenizer.from_pretrained('./bert-base-chinese/config.json')   ###从本地路径加载预训练的 BERT tokenizer 配置（Tokenizer 是 BERT 模型的重要组成部分，用于将文本转换为模型可以处理的张量形式）
+    tokenizer = BertTokenizer.from_pretrained('./bert-base-chinese/config.json')
 
-    ###准备优化器参数
-    param_optimizer = list(model.named_parameters())   ###列出所有模型参数
-    no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']  ###不进行权重衰减的参数
+    param_optimizer = list(model.named_parameters()) 
+    no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
 
-    optimizer_grouped_parameters = [  ###将参数分为俩组，一组进行权重衰减，一组不进行
+    optimizer_grouped_parameters = [  
         {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
         {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
     ]
 
-    ###配置优化器和学习率调度器
-    warmup_steps = 0.05 * num_train_steps  ###计算学习率预热步数，为总训练步数的 5%
-    optimizer = AdamW(optimizer_grouped_parameters, lr=args.learning_rate, eps=1e-8)  ###使用 AdamW 优化器，并传入分组的参数列表、学习率（args.learning_rate）和 epsilon（用于数值稳定性的参数）
+
+    warmup_steps = 0.05 * num_train_steps
+    optimizer = AdamW(optimizer_grouped_parameters, lr=args.learning_rate, eps=1e-8)  
     scheduler = get_linear_schedule_with_warmup(
-        optimizer, num_warmup_steps=warmup_steps, num_training_steps=num_train_steps   ###使用 get_linear_schedule_with_warmup 函数创建线性学习率调度器，设置预热步数和总训练步数（num_train_steps）
+        optimizer, num_warmup_steps=warmup_steps, num_training_steps=num_train_steps 
     )
-    best_acc = 0   ###初始化用于记录最佳准确率（best_acc）
+    best_acc = 0 
     all_costs = []
     words_count = 0
     intial_features = torch.tensor([f for f in intial_features],dtype=torch.float32)
@@ -235,7 +226,7 @@ if __name__ == '__main__':
             start_time = time.time()
             if torch.cuda.is_available():
                 batch = tuple(t.cuda() for t in batch)
-            s1_input_ids, s2_input_ids,edge, label = batch  ###将 batch 数据解包
+            s1_input_ids, s2_input_ids,edge, label = batch
             inputs, mask, len_max = data_masks(edge, [0])
             inputs = np.asarray(inputs)
             mask = np.asarray(mask)
@@ -277,16 +268,16 @@ if __name__ == '__main__':
             with open(args.output_dir + '/loss.txt',"a+",encoding="utf-8") as f:
                 sss += '\n'
                 f.write(sss)
-            loss.backward()  ###进行反向传播，计算梯度
+            loss.backward() 
 
-            # nn.utils.clip_grad_norm(model.parameters(), max_norm=20, norm_type=2)   # 是否进行梯度裁剪
+            # nn.utils.clip_grad_norm(model.parameters(), max_norm=20, norm_type=2)
 
             if (step + 1) % args.gradient_accumulation_steps == 0:
-                optimizer.step()  ##更新模型参数
-                scheduler.step()  ##更新学习率
-                optimizer.zero_grad()  ##清零梯度
+                optimizer.step()
+                scheduler.step()  
+                optimizer.zero_grad()
                 global_step += 1
-            # 一轮跑完 进行eval
+
         acc,pre,recall,f1 = evaluate(model)
         print(f"epoch:{epoch},acc:{acc},pre:{pre},recall:{recall},f1:{f1}")
 
@@ -296,7 +287,7 @@ if __name__ == '__main__':
             f.write(ss)
         if acc > best_acc:
             print(f"best epoch:\t\n acc:{acc}\t\n pre:{pre} recall:{recall}\t\n f1:{f1}\t\n ")
-            model_to_save = model.module if hasattr(model, 'module') else model  # Only save the model it-self 检查model是否具有module属性。这个属性通常在模型被DataParallel或DistributedDataParallel包裹时存在。
+            model_to_save = model.module if hasattr(model, 'module') else model  # Only save the model it-self
             output_model_file = os.path.join(args.output_dir, "best_pytorch_model.bin")
             torch.save(model_to_save.state_dict(), output_model_file)
         model_to_save = model.module if hasattr(model, 'module') else model

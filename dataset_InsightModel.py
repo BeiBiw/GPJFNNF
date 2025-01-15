@@ -129,11 +129,9 @@ def get_insight(config):
         target[data_type]['data'] = np.array([dico_label[line.rstrip('\n')]
                 for line in open(target[data_type]['path'], 'r')])
 
-        # 将g1/g2中每一行中对应的id转换成为对应的内容，存入对应的g1/g2[data_type]['sent']中
         g1[data_type]['sent'] = turn_graphid_2_content(g1[data_type]['similar'], False)
         g2[data_type]['sent'] = turn_graphid_2_content(g2[data_type]['similar'], True)
 
-        # graph处理：长度填充 + 生成掩码masks
         graph1_inputs = []
         graph2_inputs = []
         g1_list = g1[data_type]['similar']
@@ -180,12 +178,12 @@ def data_masks(all_usr_pois, item_tail):
 
 def word_segmentation(content_list, word_tokenizer, word_vec):
     STOPWORDS = [':', '：', '、', '\\', 'N', '；', ';', '（', '）', '◆'
-                 '[', ']', '【', '】', '＋', ',', '', '，', '。', '等', '的',
-                 '及', ' ']
+                 '[', ']', '【', '】', '＋', ',', '', '，', '。', 
+                  ' ']
     content = ""
     for c in content_list:
         content += c
-    content_seg_list = list(word_tokenizer(content)) # 分词后的list
+    content_seg_list = list(word_tokenizer(content))
     res_list = []
     for word in content_seg_list:
         if word not in STOPWORDS:

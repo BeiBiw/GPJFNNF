@@ -1,7 +1,6 @@
 import os
 import random
 import json
-import jieba
 import torch
 import argparse
 import numpy as np
@@ -69,7 +68,7 @@ def build_vocab(sentences, glove_path):
 
 def turn_graphid_2_content(total_id_list, isCV=True):
     ret_list = []
-    word_tokenizer = jieba.cut
+    word_tokenizer = cut
 
     if isCV:
         f_path = "data/step1_data/exp_morethan_50_graph/user.json"

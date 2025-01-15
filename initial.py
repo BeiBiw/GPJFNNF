@@ -61,7 +61,6 @@ model = BERTModel()
 
 bs = 8
 
-# 计算需要的分块数
 num_chunks = (zong_ids.size(0) + bs - 1) // bs
 batches = torch.chunk(zong_ids, num_chunks)
 
@@ -70,6 +69,6 @@ for batch in batches:
     output = model(batch)
     for line in output:
         a.append(line.detach().tolist())
-    print(output.shape)  # 打印模型输出的形状
+    print(output.shape)
 with gzip.open('./w2v/features_intial.pkl.gz', 'wb') as fout:
     pickle.dump(a, fout)

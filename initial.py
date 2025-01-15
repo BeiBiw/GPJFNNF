@@ -6,7 +6,7 @@ from torch.nn.parameter import Parameter
 from torch.nn.modules import Module
 import math
 from dataset_InsightModel import *
-from GraphModel import *
+from Graph import *
 from model.KAN import KANLinear
 import gzip
 import pickle
